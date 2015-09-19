@@ -1,7 +1,6 @@
 package black.door.dbp;
 
-import black.door.dbp.handlers.StandardErrorHandler;
-import black.door.dbp.handlers.StandardOutHandler;
+import black.door.dbp.formatters.StandardFormatter;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,9 +15,15 @@ public enum DBP {
 	INSTANCE;
 
 	private Map<String, Channel> channels;
+	private StandardFormatter sf;
+	private StandardFormatter ef;
 
 	DBP(){
 		channels = new ConcurrentHashMap<>();
+		sf = new StandardFormatter();
+		ef = new StandardFormatter();
+		sf.setPrintingLine(false);
+		ef.setPrintingLine(true);
 
 		//region DEV
 		Channel dev = getStdOutChannel(DEV);
@@ -58,15 +63,14 @@ public enum DBP {
 
 	private static Channel getStdOutChannel(StandardChannelName name){
 		Channel c = new Channel(name.name());
-		c.registerHandler("stdout", new StandardOutHandler());
+		c.registerHandler(e -> System.out.print(INSTANCE.sf.apply(e)), "stdout");
 		c.setPriority(name.ordinal());
 		return c;
 	}
 
 	private static Channel getStdErrChannel(StandardChannelName name){
 		Channel c = new Channel(name.name());
-		c.registerHandler("stderr", new StandardErrorHandler()
-				.setPrintingLine(true));
+		c.registerHandler(e -> System.err.print(INSTANCE.ef.apply(e)), "stderr");
 		c.setPriority(name.ordinal());
 		return c;
 	}

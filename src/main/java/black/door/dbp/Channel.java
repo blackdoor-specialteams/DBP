@@ -1,21 +1,22 @@
 package black.door.dbp;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Consumer;
 
 /**
  * Created by nfischer on 9/15/2015.
  */
 public class Channel {
-	private Map<String, Consumer<Entry>> handlers;
+	private Set<String> handlers;
+	private Consumer<Entry> handler;
 	private boolean enabled;
 	private String name;
 	private int priority = Integer.MAX_VALUE;
 
 	public Channel(String name){
 		this.name = name.toUpperCase();
-		handlers = new ConcurrentHashMap<>();
+		handler = (e) -> {};
+		handlers = new ConcurrentSkipListSet<>();
 		enabled = true;
 	}
 
@@ -36,16 +37,33 @@ public class Channel {
 		this.name = name;
 	}
 
-	public Channel registerHandler(String name, Consumer<Entry> handler){
-		String n = name.toLowerCase();
-		assert !handlers.containsKey(n) : "This channel already has a handler" +
-				" with that name";
-		handlers.put(n, handler);
+	/**
+	 * Registers a handler to this channel. Be careful not to register the same
+	 * handler multiple times with this method. If unsure,
+	 * registerHandler(Consumer<Entry>, String) is safer.
+	 * @param handler
+	 * @return
+	 */
+	public Channel registerHandler(Consumer<Entry> handler){
+		this.handler = this.handler.andThen(handler);
 		return this;
 	}
 
-	public Consumer<Entry> getHandler(String name){
-		return handlers.get(name.toLowerCase());
+	/**
+	 * Registers a handler with a given name. Has the same effect as
+	 * registerHandler(Consumer<Entry>) but provides an assertion that no handler
+	 * has yet been registered to this Channel with that name.
+	 * @param handler
+	 * @param name
+	 * @return
+	 */
+	public Channel registerHandler(Consumer<Entry> handler, String name){
+		String namee = name.toLowerCase();
+		assert !handlers.contains(namee)
+				: "A handler with this name has already been registered.";
+		registerHandler(handler);
+		handlers.add(namee);
+		return this;
 	}
 
 	public boolean isEnabled() {
@@ -70,11 +88,7 @@ public class Channel {
 	}
 
 	public void log(Object message, Object... extras){
-		if(enabled){
-			Entry entry = new Entry(name, message, extras);
-			handlers.entrySet().stream().forEach(
-					e -> e.getValue().accept(entry)
-			);
-		}
+		if(enabled)
+			handler.accept( new Entry(name, message, extras));
 	}
 }
